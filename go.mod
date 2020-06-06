@@ -1,4 +1,4 @@
-module github.com/birchwood-langham/fsm
+module github.com/birchwood-langham/simple-fsm
 
 go 1.14
 
