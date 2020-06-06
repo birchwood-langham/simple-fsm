@@ -138,7 +138,7 @@ func (l *Locked) Run(incoming chan fsm.Event) (fsm.State, error) {
 }
 
 func (l *Locked) Next(_ fsm.State) (fsm.State, error) {
-  u := UnlockedState()
+  u := Unlocked{}
   u.AddTransition(u.Pushed, u.Next)
 
   return u, nil
@@ -188,7 +188,7 @@ func (u *Unlocked) Run(incoming chan fsm.Event) (fsm.State, error) {
 }
 
 func (u *Unlocked) Next(_ fsm.State) (fsm.State, error) {
-  l := LockedState()
+  l := Locked{}
   l.AddTransition(l.HasCoin, l.Next)
 
   return l, nil
@@ -214,7 +214,7 @@ func main() {
   sm := fsm.New(eventsChannel)
 
   // create our initial state
-  locked := LockedState()
+  locked := Locked{}
 
   // add the transitions we expect the states to handle, our state definition provides our TransactionCheck function HasCoin
   // and the Next() function defines how we transition to the next state
