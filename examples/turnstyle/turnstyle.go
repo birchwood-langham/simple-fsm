@@ -7,11 +7,6 @@ import (
 	"github.com/birchwood-langham/fsm"
 )
 
-const (
-	InsertCoin fsm.EventType = "Insert Coin"
-	Push       fsm.EventType = "Push Turnstyle"
-)
-
 type Locked struct {
 	hasCoin     bool
 	transitions []fsm.Transition
@@ -31,11 +26,11 @@ func (l *Locked) Run(incoming chan fsm.Event) (fsm.State, error) {
 			return nil, nil
 		}
 
-		switch e.EventType() {
-		case Push:
+		switch e.(type) {
+		case PushEvent:
 			log.Println("Please insert coin first")
 			continue
-		case InsertCoin:
+		case InsertCoinEvent:
 			log.Println("Coin inserted")
 
 			l.hasCoin = true
@@ -59,36 +54,28 @@ func (l *Locked) AddTransition(check func() bool, next fsm.State) {
 	l.transitions = append(l.transitions, fsm.Transition{Check: check, Next: next})
 }
 
-type AddMoney struct {
+type InsertCoinEvent struct {
 	timestamp time.Time
 }
 
-func (AddMoney) EventType() fsm.EventType {
-	return InsertCoin
-}
-
-func (a AddMoney) Timestamp() time.Time {
+func (a InsertCoinEvent) Timestamp() time.Time {
 	return a.timestamp
 }
 
-func NewAddMoney() AddMoney {
-	return AddMoney{timestamp: time.Now()}
+func InsertCoin() InsertCoinEvent {
+	return InsertCoinEvent{timestamp: time.Now()}
 }
 
-type PushTurnstyle struct {
+type PushEvent struct {
 	timestamp time.Time
 }
 
-func (PushTurnstyle) EventType() fsm.EventType {
-	return Push
-}
-
-func (p PushTurnstyle) Timestamp() time.Time {
+func (p PushEvent) Timestamp() time.Time {
 	return p.timestamp
 }
 
-func NewPushTurnstyle() PushTurnstyle {
-	return PushTurnstyle{timestamp: time.Now()}
+func Push() PushEvent {
+	return PushEvent{timestamp: time.Now()}
 }
 
 type Unlocked struct {
@@ -117,11 +104,11 @@ func (u *Unlocked) Run(incoming chan fsm.Event) (fsm.State, error) {
 			return nil, nil
 		}
 
-		switch e.EventType() {
-		case InsertCoin:
+		switch e.(type) {
+		case InsertCoinEvent:
 			log.Println("Coin already inserted, returning coin")
 			continue
-		case Push:
+		case PushEvent:
 			log.Println("Turning turnstyle")
 
 			u.pushed = true
@@ -138,6 +125,18 @@ func (u *Unlocked) Run(incoming chan fsm.Event) (fsm.State, error) {
 	}
 }
 
+type PullEvent struct {
+	timestamp time.Time
+}
+
+func (p PullEvent) Timestamp() time.Time {
+	return p.timestamp
+}
+
+func Pull() PullEvent {
+	return PullEvent{timestamp: time.Now()}
+}
+
 func main() {
 	eventsChannel := make(chan fsm.Event)
 
@@ -151,10 +150,11 @@ func main() {
 
 	go sm.Run(locked)
 
-	eventsChannel <- NewPushTurnstyle()
-	eventsChannel <- NewAddMoney()
-	eventsChannel <- NewAddMoney()
-	eventsChannel <- NewPushTurnstyle()
+	eventsChannel <- Push()
+	eventsChannel <- Pull()
+	eventsChannel <- InsertCoin()
+	eventsChannel <- InsertCoin()
+	eventsChannel <- Push()
 
 	time.Sleep(time.Second)
 
