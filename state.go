@@ -8,5 +8,5 @@ type State interface {
 	// whether a transition to another state should be performed
 	Run(chan Event) (State, error)
 	// AddTransition adds a transition for the state
-	AddTransition(func() bool, State)
+	AddTransition(TransitionCheck, TransitionNext)
 }
