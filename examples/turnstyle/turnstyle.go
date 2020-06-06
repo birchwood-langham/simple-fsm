@@ -59,16 +59,36 @@ func (l *Locked) AddTransition(check func() bool, next fsm.State) {
 	l.transitions = append(l.transitions, fsm.Transition{Check: check, Next: next})
 }
 
-type AddMoney struct{}
+type AddMoney struct {
+	timestamp time.Time
+}
 
 func (AddMoney) EventType() fsm.EventType {
 	return InsertCoin
 }
 
-type PushTurnstyle struct{}
+func (a AddMoney) Timestamp() time.Time {
+	return a.timestamp
+}
+
+func NewAddMoney() AddMoney {
+	return AddMoney{timestamp: time.Now()}
+}
+
+type PushTurnstyle struct {
+	timestamp time.Time
+}
 
 func (PushTurnstyle) EventType() fsm.EventType {
 	return Push
+}
+
+func (p PushTurnstyle) Timestamp() time.Time {
+	return p.timestamp
+}
+
+func NewPushTurnstyle() PushTurnstyle {
+	return PushTurnstyle{timestamp: time.Now()}
 }
 
 type Unlocked struct {
@@ -131,10 +151,10 @@ func main() {
 
 	go sm.Run(locked)
 
-	eventsChannel <- PushTurnstyle{}
-	eventsChannel <- AddMoney{}
-	eventsChannel <- AddMoney{}
-	eventsChannel <- PushTurnstyle{}
+	eventsChannel <- NewPushTurnstyle()
+	eventsChannel <- NewAddMoney()
+	eventsChannel <- NewAddMoney()
+	eventsChannel <- NewPushTurnstyle()
 
 	time.Sleep(time.Second)
 
