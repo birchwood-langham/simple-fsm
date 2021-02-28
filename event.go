@@ -3,7 +3,7 @@ package fsm
 import (
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/oklog/ulid/v2"
 )
 
 // Event is something that happens in the state machine
@@ -11,7 +11,7 @@ import (
 // the state should transition to a new state
 type Event interface {
 	// ID is the unique identifier for the event
-	ID() uuid.UUID
+	ID() ulid.ULID
 	// Timestamp of the event
 	Timestamp() time.Time
 }

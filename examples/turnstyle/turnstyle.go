@@ -2,15 +2,35 @@ package main
 
 import (
 	"log"
+	"math/rand"
+	"sync"
 	"time"
 
-	"github.com/birchwood-langham/fsm"
-	"github.com/google/uuid"
+	"github.com/oklog/ulid/v2"
+
+	fsm "github.com/birchwood-langham/simple-fsm"
 )
+
+var once sync.Once
+var entropy *ulid.MonotonicEntropy
+
+func NewULID() ulid.ULID {
+	once.Do(func() {
+		entropy = ulid.Monotonic(rand.New(rand.NewSource(time.Now().UnixNano())), 0)
+	})
+
+	for {
+		id, err := ulid.New(ulid.Timestamp(time.Now()), entropy)
+		if err != nil {
+			continue
+		}
+		return id
+	}
+}
 
 // InsertCoinEvent represents an insert coin action
 type InsertCoinEvent struct {
-	id        uuid.UUID
+	id        ulid.ULID
 	timestamp time.Time
 }
 
@@ -20,26 +40,26 @@ func (a InsertCoinEvent) Timestamp() time.Time {
 }
 
 // ID is the unique identifier for the event
-func (a InsertCoinEvent) ID() uuid.UUID {
+func (a InsertCoinEvent) ID() ulid.ULID {
 	return a.id
 }
 
 // InsertCoin constructs an InsertCoinEvent
 func InsertCoin() InsertCoinEvent {
 	return InsertCoinEvent{
-		id:        uuid.New(),
+		id:        NewULID(),
 		timestamp: time.Now(),
 	}
 }
 
 // PushEvent represents a push action on the turnstyle
 type PushEvent struct {
-	id        uuid.UUID
+	id        ulid.ULID
 	timestamp time.Time
 }
 
 // ID is the unique identifier for the event
-func (p PushEvent) ID() uuid.UUID {
+func (p PushEvent) ID() ulid.ULID {
 	return p.id
 }
 
@@ -51,14 +71,14 @@ func (p PushEvent) Timestamp() time.Time {
 // Push constructs a PushEvent
 func Push() PushEvent {
 	return PushEvent{
-		id:        uuid.New(),
+		id:        NewULID(),
 		timestamp: time.Now(),
 	}
 }
 
 // PullEvent represents a pull action on the turnstyle
 type PullEvent struct {
-	id        uuid.UUID
+	id        ulid.ULID
 	timestamp time.Time
 }
 
@@ -67,15 +87,15 @@ func (p PullEvent) Timestamp() time.Time {
 	return p.timestamp
 }
 
-// ID returns the UUID for the PullEvent
-func (p PullEvent) ID() uuid.UUID {
+// ID returns the ulid for the PullEvent
+func (p PullEvent) ID() ulid.ULID {
 	return p.id
 }
 
-// Pull creates a PullEvent with a new UUID and the current timestamp
+// Pull creates a PullEvent with a new ulid and the current timestamp
 func Pull() PullEvent {
 	return PullEvent{
-		id:        uuid.New(),
+		id:        NewULID(),
 		timestamp: time.Now(),
 	}
 }
