@@ -28,17 +28,18 @@ A state can have multiple transitions so that it may transition to different sta
 ### Event Interface
 
 A state can process any event that implenents the Event interface. The Event interface is again, very simple requiring just an ID to identify the event and a timestamp to know when the event happened.
+We use a ULID instead of a UUID as a ULID can be be sorted in time order to get the correct sequence of events.
 
 ```go
 type Event interface {
-  ID() uuid.UUID
+  ID() ulid.ULID
   Timestamp() time.Time
 }
 ```
 
 ### Transition
 
-A transition consists of two things, a check function and a transition function. The check function is used to check whether a state is ready to transition to another state. The transition function should create the new state you need to transition to.
+A transition consists of two things, a check function, and a transition function. The check function is used to check whether a state is ready to transition to another state. The transition function should create the new state you need to transition to.
 
 A transition is therefore simply defined as
 
@@ -61,9 +62,15 @@ For our turnstyle example we need to define the states and events that our turns
 From the requirements we can see we need two events `InsertCoinEvent` and `PushEvent` and we need two states `Locked` and `Unlocked`.
 
 ```go
+
+func NewULID() ulid.ULID() {
+	...
+}
+
+
 // Turnstyle Events
 type InsertCoinEvent struct {
-  id        uuid.UUID
+  id        ulid.ULID
   timestamp time.Time
 }
 
@@ -71,23 +78,23 @@ func (a InsertCoinEvent) Timestamp() time.Time {
   return a.timestamp
 }
 
-func (a InsertCoinEvent) ID() uuid.UUID {
+func (a InsertCoinEvent) ID() ulid.ULID {
   return a.id
 }
 
 func InsertCoin() InsertCoinEvent {
   return InsertCoinEvent{
-    id:        uuid.New(),
+    id:        NewULID(),
     timestamp: time.Now(),
   }
 }
 
 type PushEvent struct {
-  id        uuid.UUID
+  id        ulid.ULID
   timestamp time.Time
 }
 
-func (p PushEvent) ID() uuid.UUID {
+func (p PushEvent) ID() ulid.ULID {
   return p.id
 }
 
@@ -97,7 +104,7 @@ func (p PushEvent) Timestamp() time.Time {
 
 func Push() PushEvent {
   return PushEvent{
-    id:        uuid.New(),
+    id:        NewULID(),
     timestamp: time.Now(),
   }
 }
