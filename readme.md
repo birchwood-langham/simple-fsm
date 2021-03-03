@@ -15,7 +15,7 @@ The `State` interface is very simple:
 ```go
 type State interface {
   Run(chan Event) (State, error)
-  AddTransition(TransitionCheck, TransitionNext)
+  WithTransitions(...Transition) State
 }
 ```
 
@@ -27,7 +27,7 @@ A state can have multiple transitions so that it may transition to different sta
 
 ### Event Interface
 
-A state can process any event that implenents the Event interface. The Event interface is again, very simple requiring just an ID to identify the event and a timestamp to know when the event happened.
+A state can process any event that implements the Event interface. The Event interface is again, very simple requiring just an ID to identify the event, and a timestamp to know when the event happened.
 We use a ULID instead of a UUID as a ULID can be be sorted in time order to get the correct sequence of events.
 
 ```go
@@ -44,7 +44,7 @@ A transition consists of two things, a check function, and a transition function
 A transition is therefore simply defined as
 
 ```go
-type TransitionCheck func() bool
+type TransitionCheck func(State) bool
 type TransitionNext func(State) (State, error)
 
 type Transition struct {
@@ -144,19 +144,22 @@ func (l *Locked) Run(incoming chan fsm.Event) (fsm.State, error) {
   return l, nil
 }
 
-func (l *Locked) Next(_ fsm.State) (fsm.State, error) {
-  u := Unlocked{}
-  u.AddTransition(u.Pushed, u.Next)
-
-  return u, nil
+func NextUnlocked(_ fsm.State) fsm.State {
+  u := Unlocked{}.WithTransitions(fsm.Transition{Check: u.Pushed, Next: u.Next})
+  return u
 }
 
-func (l *Locked) HasCoin() bool {
-  return l.hasCoin
+func HasCoin(s State) bool {
+	switch l := s.(type) {
+	case *Locked:
+	    return l.hasCoin
+    default:
+    	return false
+    }
 }
 
-func (l *Locked) AddTransition(check fsm.TransitionCheck, next fsm.TransitionNext) {
-  l.transitions = append(l.transitions, fsm.Transition{Check: check, Next: next})
+func (l *Locked) WithTransitions(transitions ...fsm.Transition) {
+  l.transitions = append(l.transitions, transitions...)
 }
 ```
 
@@ -194,19 +197,24 @@ func (u *Unlocked) Run(incoming chan fsm.Event) (fsm.State, error) {
   return u, nil
 }
 
-func (u *Unlocked) Next(_ fsm.State) (fsm.State, error) {
-  l := Locked{}
-  l.AddTransition(l.HasCoin, l.Next)
+func NextLocked(_ fsm.State) fsm.State {
+  l := Locked{}.WithTransitions(fsm.Transition{Check: l.HasCoin, Next: l.Next})
 
-  return l, nil
+  return l
 }
 
-func (u *Unlocked) AddTransition(check fsm.TransitionCheck, next fsm.TransitionNext) {
-  u.transitions = append(u.transitions, fsm.Transition{Check: check, Next: next})
+func (u *Unlocked) WithTransitions(transitions ...fsm.Transition) fsm.State {
+  u.transitions = append(u.transitions, transitions...)
+  return u
 }
 
-func (u *Unlocked) Pushed() bool {
-  return u.pushed
+func Pushed(s State) bool {
+	switch u := s.(type) {
+	case *Unlocked:
+		return u.pushed
+	default:
+		return false
+    }
 }
 ```
 
@@ -221,11 +229,11 @@ func main() {
   sm := fsm.New(eventsChannel)
 
   // create our initial state
-  locked := Locked{}
-
-  // add the transitions we expect the states to handle, our state definition provides our TransactionCheck function HasCoin
-  // and the Next() function defines how we transition to the next state
-  locked.AddTransition(locked.HasCoin, locked.Next)
+  locked := Locked{}.WithTransitions(
+    // add the transitions we expect the states to handle, our state definition provides our TransactionCheck function HasCoin
+    // and the Next() function defines how we transition to the next state
+    fsm.Transition{Check: HasCoin, Next: NextUnlocked},
+  )
 
   // Calling the Run() method starts our state machine. The state machine is run in a separate thread, and a channel is returned
   // so that we can listen for the Status of our state machine when it completes.

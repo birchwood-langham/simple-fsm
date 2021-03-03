@@ -7,6 +7,7 @@ type State interface {
 	// event channel, and then check the transitions to determine
 	// whether a transition to another state should be performed
 	Run(chan Event) (State, error)
-	// AddTransition adds a transition for the state
-	AddTransition(TransitionCheck, TransitionNext)
+	// WithTransitions adds transitions for the state and returns
+	// the updated state
+	WithTransitions(...Transition) State
 }
