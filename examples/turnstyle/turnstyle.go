@@ -138,7 +138,7 @@ func (l *Locked) Run(incoming chan fsm.Event) (fsm.State, error) {
 // checkTransitions checks the transitions for the locked state
 func (l *Locked) checkTransitions() (fsm.State, error) {
 	for _, t := range l.transitions {
-		if t.Check() {
+		if t.Check(l) {
 			return t.Next(l)
 		}
 	}
@@ -146,22 +146,28 @@ func (l *Locked) checkTransitions() (fsm.State, error) {
 	return l, nil
 }
 
-// Next is the transition function from Locked to Unlocked state
-func (l *Locked) Next(_ fsm.State) (fsm.State, error) {
-	u := UnlockedState()
-	u.AddTransition(u.Pushed, u.Next)
+// NextUnlocked is the transition function from Locked to Unlocked state
+func NextUnlocked(_ fsm.State) (fsm.State, error) {
+	u := UnlockedState().WithTransitions(
+		fsm.Transition{Check: Pushed, Next: NextLocked},
+	)
 
 	return u, nil
 }
 
 // HasCoin is the transition check function for the Locked state
-func (l *Locked) HasCoin() bool {
-	return l.hasCoin
+func HasCoin(s fsm.State) bool {
+	switch l := s.(type) {
+	case *Locked:
+		return l.hasCoin
+	default:
+		return false
+	}
 }
 
-// AddTransition adds a transition to the Locked state
-func (l *Locked) AddTransition(check fsm.TransitionCheck, next fsm.TransitionNext) {
-	l.transitions = append(l.transitions, fsm.Transition{Check: check, Next: next})
+func (l *Locked) WithTransitions(transitions ...fsm.Transition) fsm.State {
+	l.transitions = append(l.transitions, transitions...)
+	return l
 }
 
 // Unlocked represents the unlocked state of a turnstyle
@@ -170,20 +176,26 @@ type Unlocked struct {
 	transitions []fsm.Transition
 }
 
-// UnlockedState contructor
+// UnlockedState constructor
 func UnlockedState() *Unlocked {
 	u := &Unlocked{}
 	return u
 }
 
 // Pushed is the transition check function for the Unlocked state
-func (u *Unlocked) Pushed() bool {
-	return u.pushed
+func Pushed(s fsm.State) bool {
+	switch u := s.(type) {
+	case *Unlocked:
+		return u.pushed
+	default:
+		return false
+	}
 }
 
-// AddTransition appends a transition to the list of transtions for the state
-func (u *Unlocked) AddTransition(check fsm.TransitionCheck, next fsm.TransitionNext) {
-	u.transitions = append(u.transitions, fsm.Transition{Check: check, Next: next})
+// WithTransitions adds transitions to the unlocked state
+func (u *Unlocked) WithTransitions(transitions ...fsm.Transition) fsm.State {
+	u.transitions = append(u.transitions, transitions...)
+	return u
 }
 
 // Run executes the actions for the Unlocked state
@@ -208,11 +220,11 @@ func (u *Unlocked) Run(incoming chan fsm.Event) (fsm.State, error) {
 	return u.checkTransitions()
 }
 
-// checkTransition checks each of the transtions for the state to determine if
+// checkTransition checks each of the transitions for the state to determine if
 // the state is ready to transition to the next state
 func (u *Unlocked) checkTransitions() (fsm.State, error) {
 	for _, t := range u.transitions {
-		if t.Check() {
+		if t.Check(u) {
 			return t.Next(u)
 		}
 	}
@@ -220,10 +232,9 @@ func (u *Unlocked) checkTransitions() (fsm.State, error) {
 	return u, nil
 }
 
-// Next is the transtion function that changes the Unlocked state to the Locked state
-func (u *Unlocked) Next(_ fsm.State) (fsm.State, error) {
-	l := LockedState()
-	l.AddTransition(l.HasCoin, l.Next)
+// NextLocked is the transition function that changes the Unlocked state to the Locked state
+func NextLocked(_ fsm.State) (fsm.State, error) {
+	l := LockedState().WithTransitions(fsm.Transition{Check: HasCoin, Next: NextUnlocked})
 
 	return l, nil
 }
@@ -236,11 +247,12 @@ func main() {
 	sm := fsm.New(eventsChannel)
 
 	// create our initial state
-	locked := LockedState()
+	locked := LockedState().WithTransitions(
+		// add the transitions we expect the states to handle, our state definition provides our TransactionCheck function HasCoin
+		// and the Next() function defines how we transition to the next state
+		fsm.Transition{Check: HasCoin, Next: NextUnlocked},
+		)
 
-	// add the transitions we expect the states to handle, our state definition provides our TransactionCheck function HasCoin
-	// and the Next() function defines how we transition to the next state
-	locked.AddTransition(locked.HasCoin, locked.Next)
 
 	// Calling the Run() method starts our state machine. The state machine is run in a separate thread, and a channel is returned
 	// so that we can listen for the Status of our state machine when it completes.

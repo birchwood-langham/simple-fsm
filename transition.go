@@ -1,6 +1,6 @@
 package fsm
 
-type TransitionCheck func() bool
+type TransitionCheck func(State) bool
 type TransitionNext func(State) (State, error)
 
 // Transition defines a transition from the given state to the Next state
